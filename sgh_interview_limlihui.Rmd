@@ -1,0 +1,228 @@
+---
+title: "SGH Interview Assessment"
+author: "Lim Li Hui"
+date: "03/11/2021"
+output:
+  html_document:
+    theme: cerulean
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+<br>
+
+### Introduction
+
+Malaria is a disease cause by the Plasmodium parasite, and it is spread to humans through the bite of infected Anopheles mosquitoes. The disease can be serious and sometimes fatal. In this report, we take look how Malaria affects the worldwide population by using the three malaria datasets (`malaria_inc`, `malaria_death`, `malaria_death_age`) available on Github (https://github.com/rfordatascience/tidytuesday/tree/master/data/2018/2018-11-13). 
+<br>
+<br>
+
+### Malaria Incidences by Countries
+First, let's take a look at the `malaria_inc` dataset to see the incidences of malaria across the countries.
+
+```{r}
+
+library(tidyverse)
+
+# Importing the malaria incidence dataset from Github
+malaria_inc <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2018/2018-11-13/malaria_inc.csv") 
+
+# Renaming columns and filtering out the data for 2015 (i.e. latest data available in this dataset)
+colnames(malaria_inc) <- c("country", "code", "year", "inc")
+
+# Taking a look at the data is available for which years.
+unique(malaria_inc$year)
+```
+
+This dataset contains data from 2000, 2005, 2010 and 2015. Using the latest data available (i.e. year 2015), a heated world map of the worldwide malaria incidences was plotted to see the extent of malaria incidences in each country.
+<br>
+
+The heated world map shows that malaria commonly occurs in tropical and sub-tropical climates, and the continent that is most badly affected by malaria is Africa.
+```{r}
+
+# Filter out 2015's data
+malaria_inc2015 <- malaria_inc %>% 
+  filter(year ==2015) %>% 
+  na.omit() # omitting world and regional aggregated data that has NA for code.
+
+# Plotting the dataset onto a world map
+library(maps)
+world_map <- map_data("world")
+world_map <- filter(world_map, region != "Antarctica")
+
+ggplot(malaria_inc2015) +
+  geom_map(data = world_map, map = world_map, 
+           aes(long,  lat, map_id = region), 
+           color = "gray", fill = "honeydew1", size = 0.4) + 
+  geom_map(map = world_map, 
+           aes(map_id = country, fill = inc)) +
+  scale_fill_gradient(low = "honeydew1", high = "orangered", name = "Incidence") +
+  labs(title = "Incidence of Malaria in 2015", 
+       subtitle = "(per 1,000 population at risk)") +
+  theme(plot.title = element_text(size = 14, color = "steelblue", 
+                                  face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(size = 10, color = "slategray", 
+                                  face = "bold", hjust = 0.5), 
+        legend.title = element_text(size = 7),
+        legend.text = element_text(size = 7),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank())
+```
+<br>
+<br>
+
+### Malaria Deaths by Continents
+
+Next, we take a look at the number of deaths due to malaria worldwide. We mapped the countries in the `malaria_death` dataset to their respective continents to see the trends of malaria deaths in each continent.
+
+Most continents have less than 100 deaths per 100,000 people from 1990 to 2016, except for Africa where the number of deaths per 100,000 people ranges from 2000 to 3600 per year. However, we can see that the situation in Africa is slowly improving as the number of deaths has been decreasing since 2003.
+```{r}
+# Importing malaria death dataset from Github
+malaria_death <-  read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2018/2018-11-13/malaria_deaths.csv")
+
+# Renaming columns
+colnames(malaria_death) <- c("country", "code", "year", "death")
+
+# Mapping the countries to their respective continents and then grouping the data by continent
+library(countrycode)
+malaria_death$continent <- 
+  countrycode(sourcevar = malaria_death$country,
+              origin = "country.name",
+              destination = "continent")
+
+malaria_death_cont <- malaria_death %>% 
+  group_by(continent, year) %>% 
+  summarise(sum(death)) %>% 
+  drop_na()
+colnames(malaria_death_cont)[3] <-"death"
+
+# Then, we spread the data such that each continent's data is put into individual columns to prep the data for the visualisation.
+malaria_death_cont<- spread(malaria_death_cont, continent, death)
+
+# Plotting the data into a line chart
+library(highcharter)
+highchart() %>% 
+  hc_xAxis(categories = malaria_death_cont$year) %>%
+  hc_add_series(name = "Africa",
+                data = malaria_death_cont$Africa) %>%
+  hc_add_series(name = "Americas", 
+                data = malaria_death_cont$Americas) %>% 
+  hc_add_series(name = "Asia", 
+                data = malaria_death_cont$Asia) %>% 
+  hc_add_series(name = "Europe", 
+                data = malaria_death_cont$Europe) %>% 
+  hc_add_series(name = "Oceania",
+                data = malaria_death_cont$Oceania) %>% 
+  hc_title(text = "Deaths by Malaria (per 100,000 people)",
+           align = "center",
+           style = list(size = 14, 
+                        color = "steelblue",
+                        fontWeight = "bold")) %>% 
+  hc_subtitle(text = "1990 to 2016",
+              align = "center",
+              style = list(size = 10,
+                           color = "slategray", 
+                           fontWeight = "bold")) %>% 
+  hc_tooltip(crosshairs = TRUE, 
+             backgroundColor = "lemonchiffon",
+             shared = TRUE, 
+             borderWidth = 4)
+
+```
+<br>
+<br>
+
+### Top Five Countries with the Most Malaria Deaths
+
+Lastly, we zoomed in to take a look at the top five countries with the highest number of malaria deaths per 100,000 people in 2016.
+
+From the `malaria_death` dataset, we sieve out the five countries that have the highest number of malaria deaths in 2016. We can see that these five countries (Burkina Faso, Niger, Sierra Leone, Mali and Equitorial Guinea) are all located in the Africa continent.
+```{r}
+malaria_death %>% 
+  filter(year == 2016) %>% 
+  top_n(5, death) %>% 
+  arrange(desc(death))
+```
+
+Then using the `malaria_death_age` dataset, we first filter out the data for these top five countries.
+```{r}
+# Importing malaria death dataset from Github
+malaria_death_age <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2018/2018-11-13/malaria_deaths_age.csv") 
+
+# Renaming columns and remove the first column containing serial number as we have no use for it.
+malaria_death_age <- malaria_death_age[-1]
+colnames(malaria_death_age)[1] <- "country"
+colnames(malaria_death_age)[5] <- "death"
+
+# Filtering out the data for top five countries
+malaria_death_age_top5 <- malaria_death_age %>% 
+  filter(country == "Burkina Faso" | country == "Niger"|
+           country == "Sierra Leone" | country == "Mali" |
+           country == "Equatorial Guinea")
+```
+
+Then, we can put the filtered data into a stacked barchart so that we can observe the trends of malaria deaths for these countries over the years by age group. The stacked barchart shows one of the top five countries each time, and you select the country by using the dropdown list on the top left. From the barchart, we can see that more than half deaths each year come from the "Under 5" age group and this is the same for all top five countries.
+
+```{r}
+
+library(shiny)
+options(scipen=999)
+
+shinyApp(
+  
+  
+  ui <- fluidPage(
+    
+    titlePanel("Top 5 Countries with the Most Malaria Deaths"),
+    
+    # We insert a dropdown list so that users can filter the data by countries
+    selectInput("country", "Country", c("Burkina Faso", 
+    "Niger", "Sierra Leone", "Mali", "Equatorial Guinea")),
+    
+    plotOutput("barchart")
+  ),
+    
+  
+  
+  server <- function(input, output) {
+    
+    filterdata <- reactive({
+      req(input$country)
+      malaria_death_age_top5 %>% 
+        filter(country == input$country)})
+  
+  # Creating bar chart
+  output$barchart <- renderPlot({
+    
+    ggplot(filterdata(), 
+           aes(fill = factor(age_group, levels = 
+                               c("70 or older",
+                                 "50-69", "15-49", 
+                                 "5-14", "Under 5")),
+               y = death, x = year)) +
+      geom_bar(position = "stack", stat = "identity") +
+      labs(fill = "Age Group") +
+      xlab("Year") +
+      ylab("Deaths") +
+      scale_x_continuous(breaks=seq(1990, 2016, 1)) +
+      coord_flip() +
+      scale_fill_brewer(palette = "Blues") +
+      theme(plot.title = element_text(size = 14, color = "steelblue", 
+                                  face = "bold", hjust = 0.5))
+    
+  })
+  
+}, 
+  options = list(height = 500))
+```
+<br>
+<br>
+
+### Conclusion
+
+In conclusion, using the three malaria datasets on Github, we have observed that Africa is the continent that is most impacted by Malaria. The top five countries worldwide that has the most deaths due to Malaria per 100,000 people are Burkina Faso, Niger, Sierra Leone, Mali and Equatorial Guinea, which are all located in Africa continent. For these five countries, more than half of the malaria deaths each year came from children under the age of five.
+<br>
+<br>
