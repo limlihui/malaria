@@ -2,7 +2,7 @@
 title: "SGH Interview Assessment"
 author: "Lim Li Hui"
 date: "03/11/2021"
-output:
+output: 
   html_document:
     theme: cerulean
 runtime: shiny
